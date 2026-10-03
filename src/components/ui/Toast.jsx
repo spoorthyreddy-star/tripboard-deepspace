@@ -1,0 +1,199 @@
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from 'react'
+
+function CheckCircleIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+      <polyline points="22 4 12 14.01 9 11.01" />
+    </svg>
+  )
+}
+
+function AlertCircleIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  )
+}
+
+function AlertTriangleIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  )
+}
+
+function InfoIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="16" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12.01" y2="8" />
+    </svg>
+  )
+}
+
+function CloseIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+}
+
+const ToastContext = createContext(null)
+
+export function useToast() {
+  const ctx = useContext(ToastContext)
+  if (!ctx) throw new Error('useToast must be used within ToastProvider')
+  return ctx
+}
+
+export function ToastProvider({
+  children,
+  position = 'bottom-right',
+  maxToasts = 5,
+}) {
+  const [toasts, setToasts] = useState([])
+
+  const dismiss = useCallback((id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }, [])
+
+  const dismissAll = useCallback(() => {
+    setToasts([])
+  }, [])
+
+  const addToast = useCallback(
+    (options) => {
+      const id = Math.random().toString(36).slice(2)
+      const duration = options.duration ?? 5000
+
+      setToasts((prev) => {
+        const next = [...prev, { ...options, id }]
+        return next.slice(-maxToasts)
+      })
+
+      if (duration > 0) {
+        setTimeout(() => dismiss(id), duration)
+      }
+    },
+    [dismiss, maxToasts],
+  )
+
+  const toast = useCallback(
+    (options) => addToast(options),
+    [addToast],
+  )
+  const success = useCallback(
+    (title, description) =>
+      addToast({ type: 'success', title, description }),
+    [addToast],
+  )
+  const error = useCallback(
+    (title, description) =>
+      addToast({ type: 'error', title, description }),
+    [addToast],
+  )
+  const warning = useCallback(
+    (title, description) =>
+      addToast({ type: 'warning', title, description }),
+    [addToast],
+  )
+  const info = useCallback(
+    (title, description) =>
+      addToast({ type: 'info', title, description }),
+    [addToast],
+  )
+
+  const positionClasses = {
+    'top-right': 'top-4 right-4',
+    'top-left': 'top-4 left-4',
+    'bottom-right': 'bottom-4 right-4',
+    'bottom-left': 'bottom-4 left-4',
+    'top-center': 'top-4 left-1/2 -translate-x-1/2',
+    'bottom-center': 'bottom-4 left-1/2 -translate-x-1/2',
+  }
+
+  return (
+    <ToastContext.Provider
+      value={{ toasts, toast, success, error, warning, info, dismiss, dismissAll }}
+    >
+      {children}
+
+      <div
+        className={`pointer-events-none fixed z-[100] flex flex-col gap-2 ${positionClasses[position] || positionClasses['bottom-right']}`}
+      >
+        {toasts.map((t) => (
+          <ToastItem key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
+        ))}
+      </div>
+    </ToastContext.Provider>
+  )
+}
+
+const TOAST_CONFIG = {
+  success: { Icon: CheckCircleIcon, accent: 'bg-success', icon: 'text-success' },
+  error:   { Icon: AlertCircleIcon, accent: 'bg-destructive', icon: 'text-destructive' },
+  warning: { Icon: AlertTriangleIcon, accent: 'bg-warning', icon: 'text-warning' },
+  info:    { Icon: InfoIcon, accent: 'bg-info', icon: 'text-info' },
+}
+
+function ToastItem({ toast, onDismiss }) {
+  const { Icon, accent, icon } = TOAST_CONFIG[toast.type] || TOAST_CONFIG.info
+  const [exiting, setExiting] = useState(false)
+
+  useEffect(() => {
+    if (exiting) {
+      const timer = setTimeout(onDismiss, 150)
+      return () => clearTimeout(timer)
+    }
+  }, [exiting, onDismiss])
+
+  return (
+    <div
+      className={`
+        pointer-events-auto
+        relative flex items-start gap-2.5 min-w-[260px] max-w-[360px]
+        overflow-hidden rounded-lg border border-border bg-popover
+        text-popover-foreground pl-3.5 pr-2 py-2.5 shadow-lg
+        ${exiting
+          ? 'animate-out fade-out-0 slide-out-to-right-2 duration-150'
+          : 'animate-in fade-in-0 slide-in-from-right-2 duration-200'
+        }
+      `}
+      role="alert"
+    >
+      <span className={`absolute inset-y-0 left-0 w-[3px] ${accent}`} aria-hidden />
+      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${icon}`} />
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-medium leading-tight">{toast.title}</p>
+        {toast.description && (
+          <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+            {toast.description}
+          </p>
+        )}
+      </div>
+      <button
+        onClick={() => setExiting(true)}
+        className="-mr-0.5 shrink-0 cursor-pointer rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        aria-label="Dismiss"
+      >
+        <CloseIcon className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
+}
